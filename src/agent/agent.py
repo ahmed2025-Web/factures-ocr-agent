@@ -11,6 +11,7 @@ Points demandés par l'étape 8 :
 """
 
 import os
+import re
 import json
 
 from .llm import get_llm
@@ -36,7 +37,7 @@ def run_agent(user_message: str, llm, backend, history: list) -> str:
         history.append(message.model_dump())
 
         if not message.tool_calls:
-            return message.content or ""
+            return _clean(message.content or "")
 
         for call in message.tool_calls:
             args = json.loads(call.function.arguments or "{}")
@@ -47,6 +48,18 @@ def run_agent(user_message: str, llm, backend, history: list) -> str:
             history.append({"role": "tool", "tool_call_id": call.id, "content": result})
 
     return "Arrêt : nombre maximum d'étapes atteint."
+
+
+def _clean(text: str) -> str:
+    """Retire les jetons de contrôle que certains modèles (ex. gemma) laissent fuiter.
+
+    Enlève les balises de canal du style <|channel> et <channel|>, puis une
+    éventuelle amorce « thought » restée en tête.
+    """
+    text = re.sub(r"<\|[a-zA-Z]*\|?>|<[a-zA-Z]*\|>", "", text).strip()
+    if text.lower().startswith("thought"):
+        text = text[len("thought"):].lstrip(" \n:")
+    return text.strip()
 
 
 def main() -> None:

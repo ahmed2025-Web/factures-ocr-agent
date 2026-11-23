@@ -104,13 +104,42 @@ def ocr_text(pdf_path: str, dpi: int, use_cache: bool = True) -> tuple[str, floa
     return text, total
 
 
+def seed_cache_from_bronze(bronze_dir: str | None = None) -> int:
+    """Réutilise les OCR déjà faits par la bronze (même PDF, même DPI, même modèle).
+
+    Les scans ont déjà été OCRisés à l'étape 3 : inutile de rappeler le modèle
+    pour le réglage de la bronze. Retourne le nombre d'entrées ajoutées au cache.
+    """
+    import glob
+    import json
+    from ..bronze.pipeline import BRONZE_DIR
+
+    added = 0
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    for path in glob.glob(os.path.join(bronze_dir or BRONZE_DIR, "*.json")):
+        with open(path, encoding="utf-8") as fh:
+            rec = json.load(fh)
+        if rec.get("extraction_method") != "ocr" or rec.get("status") != "ok":
+            continue
+        cache = os.path.join(CACHE_DIR, f"{rec['source_sha256'][:16]}_{rec['ocr_dpi']}dpi_{rec['ocr_model']}.md")
+        if not os.path.isfile(cache):
+            with open(cache, "w", encoding="utf-8") as fh:
+                fh.write(rec["text"])
+            with open(cache + ".time", "w") as fh:
+                fh.write(f"{rec.get('ocr_seconds', 0.0):.3f}")
+            added += 1
+    return added
+
+
 # --- Évaluation -------------------------------------------------------------------
 def evaluate(dpis: list[int], sample: int | None = None, use_cache: bool = True,
-             raw_dir: str = LANDING_DIR) -> dict:
+             raw_dir: str = LANDING_DIR, origine: str | None = None) -> dict:
     """Retourne {dpi: {"fields": {champ: (justes, total)}, "seconds": [...], "errors": [...]}}."""
     truth = load_truth()
     if not truth:
         raise SystemExit("Vérité terrain vide : lancez d'abord `python -m src.eval.ocr_eval build-truth`.")
+    if origine:
+        truth = [r for r in truth if r.get("origine") == origine]
     truth = truth[:sample] if sample else truth
 
     results = {}
@@ -203,7 +232,7 @@ def write_outputs(results: dict) -> None:
     os.makedirs(os.path.dirname(RESULTS_MD), exist_ok=True)
     table = report(results)
     with open(RESULTS_MD, "w", encoding="utf-8") as fh:
-        fh.write("# Résultats de l'évaluation OCR (généré par `python -m src.eval.ocr_eval`)\n\n")
+        fh.write("# Résultats de l'évaluation OCR (produit par la commande `python -m src.eval.ocr_eval run`)\n\n")
         fh.write(f"Vérité terrain : `eval/verite_terrain.csv` — {time.strftime('%Y-%m-%d %H:%M')}\n\n")
         fh.write(table + "\n\n## Erreurs détaillées\n\n| Réglage | Fichier | Champ | Attendu | Lu |\n|---|---|---|---|---|\n")
         for s, r in results.items():
@@ -231,6 +260,8 @@ def main(argv: list[str] | None = None) -> None:
     r.add_argument("--dpi", type=int, nargs="+", default=[100, 200])
     r.add_argument("--sample", type=int)
     r.add_argument("--no-cache", action="store_true")
+    r.add_argument("--origine", choices=["natif_rasterise", "manuel"],
+                   help="n'évaluer qu'une partie de la vérité terrain")
     sub.add_parser("silver", help="comparer la table silver à la vérité terrain")
     args = ap.parse_args(argv if argv is not None else sys.argv[1:])
 
@@ -238,7 +269,9 @@ def main(argv: list[str] | None = None) -> None:
         n = build_from_native(limit=args.limit)
         print(f"{n} facture(s) ajoutée(s) à la vérité terrain.")
     elif args.cmd == "run":
-        write_outputs(evaluate(args.dpi, args.sample, not args.no_cache))
+        if not args.no_cache:
+            print(f"{seed_cache_from_bronze()} sortie(s) OCR de la bronze réutilisée(s) comme cache.")
+        write_outputs(evaluate(args.dpi, args.sample, not args.no_cache, origine=args.origine))
     else:
         write_outputs(evaluate_silver())
 

@@ -1,0 +1,21 @@
+FACTURE
+Aubry
+96, avenue de Meyer
+24403 Boyer
+SIRET : 77360260298050
+TVA intracom. : FR09773602602
+Numéro de facture : A-2025-0003
+Date d'émission : 29/04/2025
+Date d'échéance : 13/06/2025
+Catégorie : Conseil
+Statut : En retard
+Facturé à :
+Client : Dumas
+4, chemin Roger Muller
+97345 Clerc
+SIRET client : 16073375486850
+Désignation Qté Prix unitaire HT TVA Total HT
+Formation DuckDB et Parquet 5 1 261,21 · 20 % 6 306,05 ·
+Total HT 6 306,05 ·
+TVA 20 % 1 261,21 ·
+Total TTC 7 567,26 ·

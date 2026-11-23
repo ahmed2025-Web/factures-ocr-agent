@@ -62,3 +62,38 @@ def make_native_pdf(path: str, numero: str = "A-2025-0003") -> str:
         y += 16
     doc.save(path)
     return path
+
+
+def build_data_root(root) -> str:
+    """Petit jeu de données complet (bronze + silver) dans `root`, pour les tests 6 et 7.
+
+    4 factures : l'exemple OCR, une variante payée, une variante d'un autre
+    fournisseur en 2026, et un document illisible (→ quarantaine).
+    """
+    import json
+    from src.silver.pipeline import transform, write_parquet
+
+    base = fixture_text("ocr_A-2025-0003.md")
+    variants = {
+        "facture_A-2025-0003_scan.pdf": base,
+        "facture_A-2025-0007_scan.pdf": base.replace("A-2025-0003", "A-2025-0007")
+                                            .replace("En retard", "Payée"),
+        "facture_BS-2026-0001_scan.pdf": base.replace("A-2025-0003", "BS-2026-0001")
+                                             .replace("**Aubry**", "**Bernard SA**")
+                                             .replace("29/04/2025", "15/01/2026")
+                                             .replace("13/06/2025", "15/02/2026"),
+        "facture_illisible_scan.pdf": "page blanche",
+    }
+    records = [bronze_record(text, key) for key, text in variants.items()]
+    bronze = os.path.join(str(root), "bronze")
+    os.makedirs(bronze, exist_ok=True)
+    for rec in records:
+        with open(os.path.join(bronze, rec["source_key"][:-4] + ".json"), "w", encoding="utf-8") as fh:
+            json.dump(rec, fh, ensure_ascii=False)
+    write_parquet(transform(records), os.path.join(str(root), "silver"))
+    return str(root)
+
+
+@pytest.fixture
+def data_root(tmp_path):
+    return build_data_root(tmp_path / "data")

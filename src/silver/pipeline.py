@@ -22,6 +22,7 @@ Usage :
 """
 
 import os
+import re
 import glob
 import json
 import datetime
@@ -56,6 +57,11 @@ DDL = {
         motif VARCHAR, details VARCHAR, extraction_method VARCHAR,
         silver_processed_at TIMESTAMP""",
 }
+
+
+def columns(table: str) -> list[str]:
+    """Noms des colonnes d'une table (la virgule de DECIMAL(14,2) n'est pas un séparateur)."""
+    return [c.split()[0] for c in re.split(r",(?![^()]*\))", DDL[table])]
 
 
 def load_bronze(bronze_dir: str = BRONZE_DIR) -> list[dict]:
@@ -154,7 +160,7 @@ def write_parquet(tables: dict, silver_dir: str = SILVER_DIR) -> None:
     os.makedirs(silver_dir, exist_ok=True)
     con = duckdb.connect()
     for name, ddl in DDL.items():
-        cols = [c.split()[0] for c in ddl.replace("\n", " ").split(",")]
+        cols = columns(name)
         con.execute(f"CREATE TABLE {name} ({ddl})")
         rows = [[r.get(c) for c in cols] for r in tables[name]]
         if rows:

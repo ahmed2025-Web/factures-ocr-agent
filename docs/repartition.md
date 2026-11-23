@@ -1,38 +1,39 @@
 # Répartition du travail
 
-Binôme : **Ahmed** et **sa binôme**. Objectif : contribution équilibrée en
-qualité (pas seulement en nombre de tâches), et commits réguliers après chaque
-sous-étape.
+On est deux sur le projet : Ahmed et Salma. On s'est partagé les étapes pour avoir
+à peu près la même charge chacun, et surtout on commite au fur et à mesure (après
+chaque étape, pas tout d'un coup à la fin).
 
 ## Qui fait quoi
 
-| Étape | Sujet | Responsable | Points |
-|-------|-------|-------------|--------|
-| 1 | Récupération S3 + détection texte/image | Ahmed | 1 |
-| 2 | Intégration OCR LightOnOCR-3 | Ahmed | 2 |
-| 3 | Couche bronze | Ahmed | 2 |
-| 8 | Agent IA (LLM interchangeable) | Ahmed | 2 |
-| 4 | Couche silver | Binôme | 3 |
-| 5 | Évaluation de la qualité OCR | Binôme | 2 |
-| 6 | Entrepôt (stockage / calcul) | Binôme | 1 |
-| 7 | Serveur MCP | Binôme | 3 |
-| 9 | Industrialisation | Partagé | 2 |
-| — | Lancement / doc | Partagé | 1 |
-| — | Rapport / démo | Partagé | 1 |
+**Ahmed** — la partie qui fabrique la donnée, du PDF brut jusqu'aux tables propres :
+- étape 1 : récupération des factures (S3) et détection texte/image
+- étape 2 : OCR avec LightOnOCR-3
+- étape 3 : couche bronze
+- étape 8 : l'agent (avec le LLM qu'on peut changer par config)
 
-Chacun : ~10 points de responsabilité, un livrable « lourd » chacun
-(Ahmed : bronze+agent ; binôme : silver+MCP).
+**Salma** — la partie qui exploite la donnée et la met au service de l'IA :
+- étape 4 : couche silver
+- étape 5 : évaluation de la qualité de l'OCR
+- étape 6 : l'entrepôt
+- étape 7 : le serveur MCP
 
-## Le contrat entre les deux moitiés
+Le reste (étape 9 industrialisation, la doc de lancement, le rapport et la démo)
+on le fait à deux.
 
-La frontière est le **schéma de la couche silver**. À définir ensemble très tôt
-(tables, colonnes, types) pour que la binôme puisse construire entrepôt + MCP +
-agent sur une petite base d'exemple pendant que la partie ingestion se remplit.
+On a chacun un gros morceau : la silver pour Salma, l'agent pour Ahmed.
 
-## Workflow git
+## Là où nos deux parties se rejoignent
+
+La jonction, c'est le schéma de la couche silver (les tables, les colonnes, les
+types). On le fixe ensemble dès le début : comme ça Salma peut avancer sur
+l'entrepôt, le MCP et l'agent avec quelques factures d'exemple, sans attendre
+qu'Ahmed ait fini de remplir tout le pipeline.
+
+## Git
 
 - `main` reste stable.
-- Une branche par étape : `etape-1-ingestion`, `etape-8-agent`, …
-- Pull Request relue par l'autre avant merge.
-- Un commit par sous-étape, message clair, sous l'identité git de chacun.
-- Aucun secret commité (tout dans `.env`).
+- Une branche par étape (ex. `etape-1-ingestion`).
+- Pull request relue par l'autre avant de merger.
+- Chacun commite avec son propre compte GitHub.
+- Aucun secret dans le dépôt : tout ce qui est clé ou identifiant va dans `.env`.

@@ -33,6 +33,8 @@ data/             zone d'arrivée locale (ignorée par git)
 
 ## Installation
 
+Guide détaillé (dont **où créer les clés API**) : [docs/SETUP.md](docs/SETUP.md).
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate

@@ -61,3 +61,9 @@ python3 -m src.ocr.client ~/Téléchargements/une_facture_scan.pdf
 
 Les étapes suivantes (silver, entrepôt, MCP, agent) auront leurs commandes ici
 au fur et à mesure.
+
+## Besoin d'un exemple de sortie OCR ?
+
+Pour voir le format que produit l'OCR (utile pour l'étape 4 silver) sans avoir à
+tout lancer : voir [docs/exemple-sortie-ocr.md](exemple-sortie-ocr.md). On peut
+aussi en regénérer un avec `python3 -m src.ocr.client une_facture_scan.pdf`.

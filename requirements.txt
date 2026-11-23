@@ -1,5 +1,6 @@
 # Point de départ — à ajuster selon vos choix techniques (à justifier dans le rapport).
 python-dotenv>=1.0.0
 boto3>=1.34.0        # client S3 (étape 1)
+pypdf>=4.0.0         # détection de couche texte dans les PDF (étape 1)
 requests>=2.31.0     # appels HTTP vers l'OCR (étape 2)
 groq>=0.11.0         # LLM hébergé de l'agent (étape 8)

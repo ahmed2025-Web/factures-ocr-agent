@@ -7,3 +7,4 @@ pymupdf>=1.24.0      # rendu d'une page PDF en image pour l'OCR (étape 2)
 openai>=1.40.0       # client (compatible OpenAI) pour le LLM de l'agent (étape 8)
 duckdb>=1.1.0        # moteur SQL de la silver et de l entrepot (etapes 4 et 6)
 pytest>=8.0.0        # tests automatises
+mcp>=1.10,<2         # serveur et client Model Context Protocol (etape 7)

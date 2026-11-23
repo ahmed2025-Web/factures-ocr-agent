@@ -69,13 +69,88 @@ class MockBackend(ToolsBackend):
 
 
 class McpBackend(ToolsBackend):
-    """Vrai branchement au serveur MCP de l'étape 7 — à compléter."""
+    """Branchement au serveur MCP de l'étape 7 (transport stdio).
+
+    Le client MCP est asynchrone alors que l'agent est synchrone : on fait
+    tourner une boucle asyncio dans un thread dédié, qui garde UNE session MCP
+    ouverte pendant toute la conversation (le serveur n'est lancé qu'une fois).
+    """
+
+    def __init__(self, command: list[str] | None = None):
+        import sys
+        import asyncio
+        import threading
+
+        self._command = command or [sys.executable, "-m", "src.mcp_server.server"]
+        self._loop = asyncio.new_event_loop()
+        threading.Thread(target=self._loop.run_forever, daemon=True).start()
+        self._ready = threading.Event()
+        self._stop = None
+        self._session = None
+        self._tools = None
+        self._submit(self._open()).result(timeout=60)
+
+    def _submit(self, coro):
+        import asyncio
+        return asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+    async def _open(self):
+        import asyncio
+        from mcp import ClientSession
+        from mcp.client.stdio import stdio_client, StdioServerParameters
+
+        self._stop = asyncio.Event()
+        opened = asyncio.get_running_loop().create_future()
+        params = StdioServerParameters(command=self._command[0], args=self._command[1:],
+                                       env=dict(os.environ))
+
+        async def hold():
+            try:
+                async with stdio_client(params) as (r, w):
+                    async with ClientSession(r, w) as session:
+                        await session.initialize()
+                        self._session = session
+                        opened.set_result(True)
+                        await self._stop.wait()  # garde la session ouverte
+            except Exception as exc:  # serveur introuvable, crash au démarrage…
+                if not opened.done():
+                    opened.set_exception(exc)
+
+        self._holder = asyncio.ensure_future(hold())
+        await opened
 
     def tools(self) -> list:
-        raise NotImplementedError("TODO : se connecter au serveur MCP et exposer ses outils")
+        """Outils du serveur MCP, au format « function calling » attendu par le LLM."""
+        if self._tools is None:
+            listed = self._submit(self._session.list_tools()).result(timeout=30)
+            self._tools = [{
+                "type": "function",
+                "function": {"name": t.name, "description": t.description or "",
+                             "parameters": t.inputSchema},
+            } for t in listed.tools]
+        return self._tools
 
     def call(self, name: str, arguments: dict) -> str:
-        raise NotImplementedError("TODO : router l'appel vers le serveur MCP")
+        """Appelle l'outil et met en forme : d'abord le SQL exécuté, puis le résultat."""
+        try:
+            res = self._submit(self._session.call_tool(name, arguments)).result(timeout=60)
+        except Exception as exc:
+            return f"Erreur d'appel MCP : {type(exc).__name__}: {exc}"
+        text = "\n".join(c.text for c in res.content if getattr(c, "text", None))
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            return text
+        lines = []
+        for trace in data.pop("sql_executees", []):
+            params = f"   -- paramètres : {trace['parametres']}" if trace.get("parametres") else ""
+            lines.append(f"SQL exécuté : {trace['sql']}{params}")
+        lines.append("Résultat : " + json.dumps(data, ensure_ascii=False))
+        return "\n".join(lines)
+
+    def close(self) -> None:
+        if self._stop is not None:
+            self._loop.call_soon_threadsafe(self._stop.set)
 
 
 def get_backend() -> ToolsBackend:

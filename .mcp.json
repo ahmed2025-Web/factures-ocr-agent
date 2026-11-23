@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "factures": {
+      "command": ".venv/bin/python",
+      "args": ["-m", "src.mcp_server.server"]
+    }
+  }
+}

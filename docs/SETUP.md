@@ -88,6 +88,13 @@ Après un `git pull` ou sur une autre machine / un conteneur, relancer
 `python3 -m src.warehouse` : les vues sont recréées avec les bons chemins.
 `DATA_ROOT` (dans `.env`) change l'emplacement des données (dossier local ou `s3://…`).
 
+```bash
+# Étape 7 — serveur MCP (lecture seule) et son script de test
+python3 -m pytest tests/test_mcp.py -v
+# brancher sur Claude Code / Claude Desktop / l'agent : voir docs/mcp.md
+AGENT_BACKEND=mcp python3 -m src.agent.agent
+```
+
 Schéma des tables et règles qualité : [docs/schema-silver.md](schema-silver.md).
 
 Tests : `python3 -m pytest`

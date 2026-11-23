@@ -2,7 +2,7 @@
 
 Chaîne de bout en bout : **facture PDF → OCR → bronze → silver → entrepôt → serveur MCP → agent IA**.
 
-Projet réalisé à deux. Voir la répartition dans [`docs/repartition.md`](docs/repartition.md).
+Projet réalisé à deux. **Rapport : [RAPPORT.md](RAPPORT.md).** Voir la répartition dans [`docs/repartition.md`](docs/repartition.md).
 
 ## Architecture
 

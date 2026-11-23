@@ -74,6 +74,20 @@ python3 -m src.eval.ocr_eval build-truth --limit 30
 python3 -m src.eval.ocr_eval run --dpi 100 200 300
 ```
 
+```bash
+# Étape 6 — entrepôt (DuckDB sur les fichiers bronze/silver, aucune copie)
+python3 -m src.warehouse                     # crée data/entrepot.duckdb (vues seules)
+python3 -m src.warehouse "SELECT statut, count(*), sum(total_ttc) FROM silver.factures GROUP BY 1"
+```
+
+**Depuis DBeaver** : Nouvelle connexion → DuckDB → chemin
+`<dépôt>/data/entrepot.duckdb`, et cocher **Read-only connection**. Schémas
+disponibles : `bronze.documents`, `silver.factures`, `silver.lignes`,
+`silver.quarantaine`, `gold.ca_mensuel`, `gold.encours_fournisseur`.
+Après un `git pull` ou sur une autre machine / un conteneur, relancer
+`python3 -m src.warehouse` : les vues sont recréées avec les bons chemins.
+`DATA_ROOT` (dans `.env`) change l'emplacement des données (dossier local ou `s3://…`).
+
 Schéma des tables et règles qualité : [docs/schema-silver.md](schema-silver.md).
 
 Tests : `python3 -m pytest`

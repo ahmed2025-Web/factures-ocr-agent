@@ -68,6 +68,12 @@ python3 -m src.silver.pipeline
 # affiche le bilan : factures acceptées, signalées (avec anomalies), quarantaine (avec motif)
 ```
 
+```bash
+# Étape 5 — évaluation de l'OCR (voir eval/README.md)
+python3 -m src.eval.ocr_eval build-truth --limit 30
+python3 -m src.eval.ocr_eval run --dpi 100 200 300
+```
+
 Schéma des tables et règles qualité : [docs/schema-silver.md](schema-silver.md).
 
 Tests : `python3 -m pytest`

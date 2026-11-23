@@ -148,16 +148,14 @@ def _parse_header(lines, f: FactureLue) -> None:
 
 
 def _fournisseur(lines) -> str | None:
-    """Le fournisseur est le premier bloc de texte sous le titre « FACTURE ».
+    """Le fournisseur est le premier nom écrit en haut de la facture.
 
-    On prend la première ligne qui n'est ni le titre, ni un libellé connu, ni une
-    adresse (commence par un chiffre).
+    Selon la source, le titre « FACTURE » est avant (sortie OCR) ou après (texte
+    natif pypdf) le bloc fournisseur : on prend la première ligne qui n'est ni le
+    titre, ni un séparateur, ni un libellé « … : … », ni une adresse.
     """
-    started = False
     for flat, orig in lines:
-        if not started:
-            if re.fullmatch(r"(facture|invoice)( .*)?", flat) and len(flat) < 40:
-                started = True
+        if re.fullmatch(r"(facture|invoice)( .*)?", flat) and len(flat) < 40:
             continue
         if re.fullmatch(r"[-=_ ]+", flat) or flat[0].isdigit() or ":" in orig:
             continue
@@ -172,16 +170,32 @@ def _parse_totals(lines, f: FactureLue) -> None:
     On prend la dernière occurrence : l'en-tête du tableau contient aussi
     « Total HT » (titre de colonne), sans montant.
     """
-    for flat, orig in lines:
+    for i, (flat, orig) in enumerate(lines):
+        # PDF natif : le montant est souvent sur la ligne SUIVANT le libellé.
+        nxt = lines[i + 1][1] if i + 1 < len(lines) else ""
+        value = lambda skip=False: _keep(_last_money(orig, skip), _alone_money(nxt))
         if re.match(r"^(montant |total )?t\.?t\.?c\.?\b|^(total|net) a payer", flat) or flat.startswith("total ttc"):
-            f.total_ttc = _keep(_last_money(orig), f.total_ttc)
+            f.total_ttc = _keep(value(), f.total_ttc)
         elif flat.startswith("total tva") or flat.startswith("montant tva"):
-            f.total_tva = _keep(_last_money(orig), f.total_tva)
+            f.total_tva = _keep(value(), f.total_tva)
         elif flat.startswith("total ht") or flat.startswith("montant ht"):
-            f.total_ht = _keep(_last_money(orig), f.total_ht)
+            f.total_ht = _keep(value(), f.total_ht)
         elif re.match(r"^tva \d", flat) and f.total_tva is None:
             # Une ligne « TVA 20 % 1 261,21 € » (une seule ligne de TVA)
-            f.total_tva = _last_money(orig, skip_percent=True)
+            f.total_tva = value(skip=True)
+
+
+_ALONE_RE = re.compile(r"^-?\d{1,3}(?:[   ]\d{3})*(?:[.,]\d{1,2})?\s*(?:€|eur|[^\w\s])?$", re.I)
+
+
+def _alone_money(line: str):
+    """Montant seul sur sa ligne (« 30 811,50 € ») ; None sinon.
+
+    Plus strict que _last_money : une désignation comme « Ramette A4 500 feuilles »
+    ne doit pas être prise pour un total.
+    """
+    line = (line or "").strip()
+    return nz.parse_money(line) if _ALONE_RE.match(line) else None
 
 
 def _keep(new, old):
@@ -274,11 +288,29 @@ def _rows_to_lignes(rows: list[list[str]]) -> list[Ligne]:
 
 def _html_tables(text: str) -> list[Ligne]:
     lignes = []
+    for rows in _html_rows(text):
+        # Un tableau de 2 colonnes (« Total HT | 731,70 € ») est un tableau de
+        # totaux, pas de lignes de détail : il est lu par _parse_totals.
+        if max((len(r) for r in rows), default=0) >= 4:
+            lignes += _rows_to_lignes(rows)
+    return lignes
+
+
+def _html_rows(text: str) -> list[list[list[str]]]:
+    """Chaque <table> du texte, sous forme de liste de lignes de cellules."""
+    tables = []
     for table in re.findall(r"<table.*?</table>", text, flags=re.S | re.I):
         p = _TableParser()
         p.feed(table)
-        lignes += _rows_to_lignes(p.rows)
-    return lignes
+        tables.append(p.rows)
+    return tables
+
+
+def _table_as_lines(match: re.Match) -> str:
+    """Remplace un <table> par des lignes de texte « cellule cellule … »."""
+    p = _TableParser()
+    p.feed(match.group(0))
+    return "\n" + "\n".join(" ".join(c for c in row if c) for row in p.rows) + "\n"
 
 
 def _markdown_tables(text: str) -> list[Ligne]:
@@ -323,9 +355,51 @@ def _plain_rows(text: str) -> list[Ligne]:
     return lignes
 
 
+# Texte natif pypdf (cas réel du jeu de factures) : UNE cellule par ligne.
+#   Désignation / Qté / Prix unitaire HT / TVA / Total HT      (en-tête)
+#   Formation DuckDB et Parquet / 9 / 1 541,05 € / 20 % / 13 869,45 €
+# On lit une machine à états : du texte (la désignation, éventuellement sur
+# plusieurs lignes) suivi de 4 lignes « quantité, montant, taux %, montant ».
+_QTY_LINE = re.compile(r"^\d+(?:[.,]\d+)?$")
+_RATE_LINE = re.compile(r"^\d+(?:[.,]\d+)?\s*%$")
+
+
+def _vertical_rows(text: str) -> list[Ligne]:
+    lines = [nz.clean_text(l) or "" for l in text.splitlines()]
+    lines = [l for l in lines if l]
+    flat = [_flatten(l) for l in lines]
+    start = None
+    for i in range(len(flat) - 4):
+        if re.match(_COLUMNS["designation"], flat[i]) and re.match(_COLUMNS["quantite"], flat[i + 1]):
+            start = i + 5  # après les 5 titres de colonnes
+            break
+    if start is None:
+        return []
+    lignes, buffer, i = [], [], start
+    while i < len(lines):
+        if flat[i].startswith(("total", "tva ", "montant")):
+            break  # fin du tableau : bloc des totaux
+        q = lines[i:i + 4]
+        if (buffer and len(q) == 4 and _QTY_LINE.match(q[0]) and _alone_money(q[1]) is not None
+                and _RATE_LINE.match(q[2]) and _alone_money(q[3]) is not None):
+            lignes.append(Ligne(
+                designation=" ".join(buffer),
+                quantite=nz.parse_amount(q[0]),
+                prix_unitaire_ht=nz.parse_money(q[1]),
+                taux_tva=nz.parse_rate(q[2]),
+                total_ht=nz.parse_money(q[3]),
+            ))
+            buffer, i = [], i + 4
+        else:
+            buffer.append(lines[i])
+            i += 1
+    return lignes
+
+
 def _parse_lignes(text: str) -> list[Ligne]:
-    """Essaie HTML, puis markdown, puis texte brut : le premier qui trouve gagne."""
-    return _html_tables(text) or _markdown_tables(text) or _plain_rows(text)
+    """Essaie HTML, markdown, une ligne par ligne de tableau, puis une cellule par
+    ligne : le premier qui trouve gagne."""
+    return _html_tables(text) or _markdown_tables(text) or _plain_rows(text) or _vertical_rows(text)
 
 
 # --- Point d'entrée -------------------------------------------------------------
@@ -334,8 +408,9 @@ def parse_invoice(text: str) -> FactureLue:
     f = FactureLue()
     if not text or not text.strip():
         return f
-    # Le tableau HTML est lu à part ; on l'enlève pour la lecture de l'en-tête.
-    header_text = re.sub(r"<table.*?</table>", "\n", text, flags=re.S | re.I)
+    # Les tableaux HTML deviennent des lignes de texte : les totaux qu'ils
+    # contiennent sont ainsi lus comme les autres.
+    header_text = re.sub(r"<table.*?</table>", _table_as_lines, text, flags=re.S | re.I)
     lines = _lines(header_text)
     _parse_header(lines, f)
     _parse_totals(lines, f)

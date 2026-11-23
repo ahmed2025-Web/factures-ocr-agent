@@ -28,8 +28,9 @@ import time
 
 import requests
 
-DEFAULT_MODEL = "lightonai/LightOnOCR-3-1B"
+DEFAULT_MODEL = "lightonocr-3-1b-test"  # nom tel que servi sur la gateway Hyperfluid
 DEFAULT_DPI = 200
+MAX_TOKENS = 4096  # une page de facture peut être longue, on laisse de la marge
 TIMEOUT_S = 120
 
 
@@ -75,6 +76,8 @@ def ocr_image(image_png: bytes) -> tuple[str, float]:
                 ],
             }
         ],
+        "temperature": 0,  # OCR : on veut une sortie déterministe
+        "max_tokens": MAX_TOKENS,
     }
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 

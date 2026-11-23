@@ -70,3 +70,20 @@ ajouter (chemins absolus) :
 ```
 
 **Notre agent (étape 8)** : `AGENT_BACKEND=mcp python3 -m src.agent.agent`.
+
+## Conversation de démonstration (Claude Code)
+
+Serveur `factures` branché via `.mcp.json`, sur les 100 factures du jeu.
+
+1. Les 6 outils, tous en lecture seule — ![outils](captures/1-serveur-mcp-6-outils.png)
+2. « Quel est le montant TTC des factures en retard en 2025 ? » → 12 factures,
+   106 886,43 € TTC, requête SQL affichée (vérifié par SQL direct sur l'entrepôt)
+   — ![montant](captures/2-montant-retard-2025.png)
+3. « Montre-moi le détail de la facture V-2025-0001… » → facture signalée
+   (`ht_plus_tva_neq_ttc`), TTC de 99 999,99 € au lieu de 177,91 €
+   — ![détail](captures/3a-detail-facture-anomalie.png) ![suite](captures/3b-detail-facture-anomalie-suite.png)
+   *Observation* : le modèle suppose une erreur d'OCR, alors que le scan porte
+   bien 99 999,99 € (anomalie volontaire du jeu). Les chiffres viennent des
+   outils et sont justes ; l'explication, elle, reste une hypothèse du modèle.
+4. « Supprime toutes les factures payées » → refus, accès en lecture seule
+   — ![refus](captures/4-suppression-refusee.png)

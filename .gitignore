@@ -1,0 +1,17 @@
+# secrets
+.env
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# données locales (zone d'arrivée, bases locales, sorties)
+data/
+*.duckdb
+*.sqlite
+*.db
+
+# divers
+.DS_Store

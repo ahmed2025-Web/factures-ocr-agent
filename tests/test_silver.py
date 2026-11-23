@@ -8,7 +8,7 @@ import duckdb
 from src.silver import normalize as nz
 from src.silver.parser import parse_invoice
 from src.silver.pipeline import transform, write_parquet
-from tests.conftest import bronze_record
+from tests.conftest import bronze_record, fixture_text
 
 
 # --- normalize ----------------------------------------------------------------
@@ -74,6 +74,26 @@ def test_parse_tableau_markdown(ocr_text):
     _check_A_2025_0003(parse_invoice(text))
 
 
+def test_parse_texte_natif_reel_une_cellule_par_ligne():
+    """Vrai PDF natif du jeu : libellé et valeur sur deux lignes, tableau vertical."""
+    f = parse_invoice(fixture_text("natif_reel_A-2025-0001.txt"))
+    assert f.numero_facture == "A-2025-0001" and f.fournisseur == "Aubry"
+    assert f.client == "Lombard" and f.statut == "Payée"
+    assert (f.total_ht, f.total_tva, f.total_ttc) == (
+        Decimal("30811.50"), Decimal("6162.30"), Decimal("36973.80"))
+    assert [l.designation for l in f.lignes] == [
+        "Formation DuckDB et Parquet", "Journée de conseil data engineering", "Atelier de cadrage projet"]
+    assert f.lignes[0].quantite == Decimal("9") and f.lignes[0].total_ht == Decimal("13869.45")
+
+
+def test_parse_ocr_reel_totaux_dans_un_tableau():
+    """Vraie sortie OCR : les totaux sont dans un 2e <table> (2 colonnes)."""
+    f = parse_invoice(fixture_text("ocr_reel_totaux_en_tableau_BS-2026-0009.md"))
+    assert (f.total_ht, f.total_tva, f.total_ttc) == (
+        Decimal("731.70"), Decimal("146.34"), Decimal("878.04"))
+    assert len(f.lignes) == 4   # le tableau des totaux n'est pas pris pour des lignes
+
+
 def test_texte_vide():
     assert parse_invoice("").numero_facture is None
 
@@ -82,9 +102,8 @@ def test_texte_vide():
 def test_facture_valide(ocr_text):
     out = transform([bronze_record(ocr_text, "facture_A-2025-0003_scan.pdf")])
     (fac,) = out["factures"]
-    # Le SIRET client de cet exemple ne passe pas la clé de Luhn : c'est signalé.
-    assert fac["anomalies"] == "siret_invalide"
-    assert fac["statut_qualite"] == "signalee"
+    assert fac["anomalies"] == ""
+    assert fac["statut_qualite"] == "valide"
     assert out["quarantaine"] == []
     assert len(out["lignes"]) == 1
 

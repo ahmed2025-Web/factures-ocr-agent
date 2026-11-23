@@ -61,8 +61,11 @@ def anomalies(f: FactureLue) -> list[str]:
     if min(f.total_ht, f.total_tva, f.total_ttc) < 0:
         codes.append("montant_negatif")
 
+    # Format seulement (14 chiffres). La clé de Luhn n'est PAS contrôlée : dans le
+    # jeu fourni, 0 SIRET client sur 30 la respecte (numéros fictifs) ; le
+    # contrôle signalerait toutes les factures et ne détecterait donc rien.
     for siret in (f.fournisseur_siret, f.client_siret):
-        if siret is not None and (len(siret) != 14 or not nz.luhn_ok(siret)):
+        if siret is not None and len(siret) != 14:
             codes.append("siret_invalide")
             break
 

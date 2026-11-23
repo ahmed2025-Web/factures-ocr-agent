@@ -34,3 +34,10 @@ exécutée** — l'agent sait déjà l'afficher (c'est le critère de transparen
 
 En résumé : toi tu fais le MCP (étape 7), et le branchement à l'agent, c'est juste
 remplir `McpBackend` + changer une variable. 🙂
+
+## Mise à jour : c'est branché
+
+`McpBackend` est complété (session stdio vers `src.mcp_server.server`). Avec
+`AGENT_BACKEND=mcp`, l'agent utilise les 6 outils réels et affiche le SQL
+exécuté avec ses paramètres. Test : `tests/test_agent_mcp.py`. Détails des
+outils et de la sécurité : [docs/mcp.md](mcp.md).

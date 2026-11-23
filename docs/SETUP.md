@@ -59,8 +59,18 @@ python3 -m src.ocr.client ~/Téléchargements/une_facture_scan.pdf
 # option : --dpi 300 pour tester une autre résolution
 ```
 
-Les étapes suivantes (silver, entrepôt, MCP, agent) auront leurs commandes ici
-au fur et à mesure.
+```bash
+# Étape 3 — couche bronze (texte natif ou OCR, incrémental)
+python3 -m src.bronze.pipeline
+
+# Étape 4 — couche silver : data/silver/{factures,lignes,quarantaine}.parquet
+python3 -m src.silver.pipeline
+# affiche le bilan : factures acceptées, signalées (avec anomalies), quarantaine (avec motif)
+```
+
+Schéma des tables et règles qualité : [docs/schema-silver.md](schema-silver.md).
+
+Tests : `python3 -m pytest`
 
 ## Besoin d'un exemple de sortie OCR ?
 
